@@ -1,0 +1,6 @@
+{
+  "name": "LIFEADMIN AI",
+  "description": "Your Everyday Problem-Solving Agent — Less time managing life. More time living it.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
