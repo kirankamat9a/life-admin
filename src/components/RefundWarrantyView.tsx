@@ -1,6 +1,8 @@
 import { AlertCircle, CheckCircle2, FileText, Mail, RefreshCw, Search } from 'lucide-react';
 import { useState } from 'react';
+import { formatINR } from '../shared/domainLogic';
 import type { CaseStatus, NavSection, WorkspaceState } from '../shared/types';
+import { HelpTip } from './HelpTip';
 
 interface RefundWarrantyViewProps {
   workspace: WorkspaceState;
@@ -28,9 +30,9 @@ function statusTextColor(status: CaseStatus): string {
       return 'text-[#F59E0B]';
     case 'Complaint Prepared':
     case 'Awaiting Response':
-      return 'text-[#635BFF]';
+      return 'text-[#635BFF] dark:text-indigo-300';
     default:
-      return 'text-[#64748B]';
+      return 'text-[#64748B] dark:text-slate-400';
   }
 }
 
@@ -81,46 +83,75 @@ export function RefundWarrantyView({
   return (
     <div className="space-y-6">
       {/* Filter & Search Bar */}
-      <div className="bg-white border border-[#E8ECF3] rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-[#F1F5F9] rounded-lg">
-          {STATUS_FILTERS.map((st) => (
-            <button
-              key={st}
-              type="button"
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 text-[12px] font-medium rounded-md transition-colors whitespace-nowrap ${
-                statusFilter === st
-                  ? 'bg-white text-[#172033] shadow-xs font-semibold'
-                  : 'text-[#64748B] hover:text-[#172033]'
-              }`}
-            >
-              {st}
-            </button>
-          ))}
+      <div className="bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-[#F1F5F9] dark:bg-slate-800 rounded-lg">
+            {STATUS_FILTERS.map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setStatusFilter(st)}
+                className={`px-3 py-1.5 text-[12px] font-medium rounded-md transition-colors whitespace-nowrap ${
+                  statusFilter === st
+                    ? 'bg-white dark:bg-slate-900 text-[#172033] dark:text-slate-100 shadow-xs font-semibold'
+                    : 'text-[#64748B] dark:text-slate-300 hover:text-[#172033] dark:hover:text-white'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+          <HelpTip
+            title="Refund & Warranty Claims"
+            description="Review purchase dates, warranty expiration, and missing proof. Click Prepare Complaint for Approval to stage a draft email in the Approval Centre."
+          />
         </div>
 
         <div className="relative w-full lg:w-72">
-          <Search className="h-4 w-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="h-4 w-4 text-[#64748B] dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="search"
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             aria-label="Filter warranty cases"
             placeholder="Filter product, seller, invoice #..."
-            className="w-full h-9 pl-9 pr-3 text-[13px] bg-[#F8FAFC] border border-[#E8ECF3] rounded-lg text-[#172033] placeholder:text-[#64748B] focus:outline-none focus:border-[#635BFF]"
+            className="w-full h-9 pl-9 pr-3 text-[13px] bg-[#F8FAFC] dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 rounded-lg text-[#172033] dark:text-slate-100 placeholder:text-[#64748B] dark:placeholder:text-slate-400 focus:outline-none focus:border-[#635BFF]"
           />
         </div>
       </div>
 
       {/* Master-Detail Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-5 bg-white border border-[#E8ECF3] rounded-xl divide-y divide-[#E8ECF3]">
+        <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl divide-y divide-[#E8ECF3] dark:divide-slate-800">
           {filteredCases.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-[14px] font-semibold text-[#172033]">No matching cases</p>
-              <p className="text-[12.5px] text-[#64748B] mt-1">
+            <div className="p-8 text-center space-y-2.5">
+              <p className="text-[14px] font-semibold text-[#172033] dark:text-slate-100">
+                No matching cases
+              </p>
+              <p className="text-[12.5px] text-[#64748B] dark:text-slate-400">
                 Clear filters or upload a new invoice in My Documents.
               </p>
+              <div className="flex items-center justify-center gap-2 pt-1">
+                {(statusFilter !== 'All' || localSearch) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter('All');
+                      setLocalSearch('');
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-[#E8ECF3] dark:border-slate-700 text-[12px] font-semibold text-[#635BFF] dark:text-indigo-300"
+                  >
+                    Clear filters
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('documents')}
+                  className="px-3 py-1.5 rounded-lg bg-[#635BFF] text-white text-[12px] font-semibold"
+                >
+                  Open My Documents
+                </button>
+              </div>
             </div>
           ) : (
             filteredCases.map((c) => {
@@ -131,21 +162,27 @@ export function RefundWarrantyView({
                   type="button"
                   onClick={() => setSelectedId(c.id)}
                   className={`w-full text-left p-4 transition-colors ${
-                    isSelected ? 'bg-[#635BFF]/[0.05]' : 'hover:bg-[#F8FAFC]'
+                    isSelected
+                      ? 'bg-[#635BFF]/[0.06] dark:bg-[#635BFF]/15'
+                      : 'hover:bg-[#F8FAFC] dark:hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-[14px] font-semibold text-[#172033]">{c.product}</p>
+                    <p className="text-[14px] font-semibold text-[#172033] dark:text-slate-100">
+                      {c.product}
+                    </p>
                     <span className={`text-[12px] font-semibold whitespace-nowrap ${statusTextColor(c.status)}`}>
                       {c.status}
                     </span>
                   </div>
-                  <p className="text-[12.5px] text-[#64748B] mt-1">
+                  <p className="text-[12.5px] text-[#64748B] dark:text-slate-400 mt-1">
                     {c.seller} · Invoice <span className="font-mono">{c.invoiceNumber}</span>
                   </p>
-                  <div className="flex items-center justify-between mt-2 text-[12px] text-[#475569] tabular-nums">
+                  <div className="flex items-center justify-between mt-2 text-[12px] text-[#475569] dark:text-slate-300 tabular-nums">
                     <span>Purchased {c.purchaseDate}</span>
-                    <span className="font-semibold text-[#172033]">${c.purchaseAmount.toFixed(2)}</span>
+                    <span className="font-semibold text-[#172033] dark:text-slate-100">
+                      {formatINR(c.purchaseAmount)}
+                    </span>
                   </div>
                 </button>
               );
@@ -155,16 +192,18 @@ export function RefundWarrantyView({
 
         {/* Case Inspector */}
         {activeCase && (
-          <div className="lg:col-span-7 bg-white border border-[#E8ECF3] rounded-xl p-6 space-y-6">
+          <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div>
                 <p className={`text-[12px] font-semibold ${statusTextColor(activeCase.status)}`}>
                   Status: {activeCase.status}
                 </p>
-                <h2 className="font-display text-[20px] font-bold text-[#172033] mt-0.5">
+                <h2 className="font-display text-[20px] font-bold text-[#172033] dark:text-slate-100 mt-0.5">
                   {activeCase.product}
                 </h2>
-                <p className="text-[13px] text-[#64748B] mt-1">{activeCase.issueSummary}</p>
+                <p className="text-[13px] text-[#64748B] dark:text-slate-400 mt-1">
+                  {activeCase.issueSummary}
+                </p>
               </div>
 
               <div className="flex flex-wrap gap-2 shrink-0">
@@ -172,7 +211,7 @@ export function RefundWarrantyView({
                   type="button"
                   disabled={busyAction !== null}
                   onClick={() => handleInvestigate(activeCase.id)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E8ECF3] bg-white text-[12.5px] font-semibold text-[#172033] hover:bg-[#F8FAFC] disabled:opacity-50 whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E8ECF3] dark:border-slate-700 bg-white dark:bg-slate-800 text-[12.5px] font-semibold text-[#172033] dark:text-slate-100 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 disabled:opacity-50 whitespace-nowrap"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span>{busyAction === 'investigate' ? 'Checking...' : 'Re-Check Policy'}</span>
@@ -195,62 +234,68 @@ export function RefundWarrantyView({
             </div>
 
             {/* Structured Case Fields */}
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-4 border-y border-[#E8ECF3] text-[13px]">
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-4 border-y border-[#E8ECF3] dark:border-slate-800 text-[13px]">
               <div>
-                <dt className="text-[11.5px] text-[#64748B]">Seller</dt>
-                <dd className="font-medium text-[#172033] mt-0.5">{activeCase.seller}</dd>
+                <dt className="text-[11.5px] text-[#64748B] dark:text-slate-400">Seller</dt>
+                <dd className="font-medium text-[#172033] dark:text-slate-100 mt-0.5">
+                  {activeCase.seller}
+                </dd>
               </div>
               <div>
-                <dt className="text-[11.5px] text-[#64748B]">Invoice Number</dt>
-                <dd className="font-mono font-medium text-[#172033] mt-0.5">{activeCase.invoiceNumber}</dd>
+                <dt className="text-[11.5px] text-[#64748B] dark:text-slate-400">Invoice Number</dt>
+                <dd className="font-mono font-medium text-[#172033] dark:text-slate-100 mt-0.5">
+                  {activeCase.invoiceNumber}
+                </dd>
               </div>
               <div>
-                <dt className="text-[11.5px] text-[#64748B]">Purchase Date</dt>
-                <dd className="font-mono tabular-nums font-medium text-[#172033] mt-0.5">
+                <dt className="text-[11.5px] text-[#64748B] dark:text-slate-400">Purchase Date</dt>
+                <dd className="font-mono tabular-nums font-medium text-[#172033] dark:text-slate-100 mt-0.5">
                   {activeCase.purchaseDate}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11.5px] text-[#64748B]">Purchase Amount</dt>
-                <dd className="font-mono tabular-nums font-semibold text-[#172033] mt-0.5">
-                  ${activeCase.purchaseAmount.toFixed(2)}
+                <dt className="text-[11.5px] text-[#64748B] dark:text-slate-400">Purchase Amount</dt>
+                <dd className="font-mono tabular-nums font-semibold text-[#172033] dark:text-slate-100 mt-0.5">
+                  {formatINR(activeCase.purchaseAmount)}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11.5px] text-[#64748B]">Warranty Period</dt>
-                <dd className="font-medium text-[#172033] mt-0.5 tabular-nums">
+                <dt className="text-[11.5px] text-[#64748B] dark:text-slate-400">Warranty Period</dt>
+                <dd className="font-medium text-[#172033] dark:text-slate-100 mt-0.5 tabular-nums">
                   {activeCase.warrantyPeriodMonths} Months
                 </dd>
               </div>
               <div>
-                <dt className="text-[11.5px] text-[#64748B]">Warranty Expiration</dt>
-                <dd className="font-mono tabular-nums font-medium text-[#172033] mt-0.5">
+                <dt className="text-[11.5px] text-[#64748B] dark:text-slate-400">Warranty Expiration</dt>
+                <dd className="font-mono tabular-nums font-medium text-[#172033] dark:text-slate-100 mt-0.5">
                   {activeCase.warrantyExpiration}
                 </dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-[11.5px] text-[#64748B]">Eligibility Analysis</dt>
-                <dd className="text-[#172033] mt-0.5">{activeCase.eligibilitySummary}</dd>
+                <dt className="text-[11.5px] text-[#64748B] dark:text-slate-400">Eligibility Analysis</dt>
+                <dd className="text-[#172033] dark:text-slate-200 mt-0.5">
+                  {activeCase.eligibilitySummary}
+                </dd>
               </div>
             </dl>
 
             {/* Missing Evidence Alert */}
             {activeCase.missingEvidence.length > 0 && (
-              <div className="p-4 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] space-y-2">
+              <div className="p-4 rounded-lg bg-[#FFFBEB] dark:bg-amber-950/50 border border-[#FDE68A] dark:border-amber-800 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 text-[13px] font-semibold text-[#B45309]">
+                  <span className="flex items-center gap-2 text-[13px] font-semibold text-[#B45309] dark:text-amber-300">
                     <AlertCircle className="h-4 w-4" />
                     Missing Evidence Detected
                   </span>
                   <button
                     type="button"
                     onClick={() => onNavigate('documents')}
-                    className="text-[12px] font-semibold text-[#635BFF] hover:underline"
+                    className="text-[12px] font-semibold text-[#635BFF] dark:text-indigo-300 hover:underline"
                   >
                     Upload in My Documents
                   </button>
                 </div>
-                <ul className="list-disc pl-5 text-[12.5px] text-[#92400E] space-y-1">
+                <ul className="list-disc pl-5 text-[12.5px] text-[#92400E] dark:text-amber-200 space-y-1">
                   {activeCase.missingEvidence.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
@@ -261,24 +306,30 @@ export function RefundWarrantyView({
             {/* Evidence Citations */}
             {activeCase.citations.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-[13px] font-semibold text-[#172033]">Verified Evidence Citations</h3>
+                <h3 className="text-[13px] font-semibold text-[#172033] dark:text-slate-100">
+                  Verified Evidence Citations
+                </h3>
                 <div className="space-y-2">
                   {activeCase.citations.map((cit) => (
                     <div
                       key={cit.id}
-                      className="flex items-start justify-between gap-3 p-3 rounded-lg bg-[#F8FAFC] border border-[#E8ECF3]"
+                      className="flex items-start justify-between gap-3 p-3 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/70 border border-[#E8ECF3] dark:border-slate-700"
                     >
                       <div className="flex items-start gap-2.5">
                         <FileText className="h-4 w-4 text-[#635BFF] shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-[12.5px] font-semibold text-[#172033]">{cit.label}</p>
-                          <p className="text-[12px] text-[#64748B] mt-0.5">{cit.excerpt}</p>
+                          <p className="text-[12.5px] font-semibold text-[#172033] dark:text-slate-100">
+                            {cit.label}
+                          </p>
+                          <p className="text-[12px] text-[#64748B] dark:text-slate-400 mt-0.5">
+                            {cit.excerpt}
+                          </p>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => onNavigate('documents')}
-                        className="text-[12px] font-medium text-[#635BFF] hover:underline whitespace-nowrap shrink-0"
+                        className="text-[12px] font-medium text-[#635BFF] dark:text-indigo-300 hover:underline whitespace-nowrap shrink-0"
                       >
                         View Doc
                       </button>
@@ -292,16 +343,18 @@ export function RefundWarrantyView({
             {activeCase.complaintDraft && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[13px] font-semibold text-[#172033]">Prepared Complaint Email</h3>
+                  <h3 className="text-[13px] font-semibold text-[#172033] dark:text-slate-100">
+                    Prepared Complaint Email
+                  </h3>
                   <button
                     type="button"
                     onClick={() => onNavigate('approvals')}
-                    className="text-[12px] font-medium text-[#635BFF] hover:underline"
+                    className="text-[12px] font-medium text-[#635BFF] dark:text-indigo-300 hover:underline"
                   >
                     Open Approval Centre
                   </button>
                 </div>
-                <pre className="p-3.5 rounded-lg bg-[#F8FAFC] border border-[#E8ECF3] text-[12px] text-[#172033] whitespace-pre-wrap font-sans leading-relaxed">
+                <pre className="p-3.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/80 border border-[#E8ECF3] dark:border-slate-700 text-[12px] text-[#172033] dark:text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
                   {activeCase.complaintDraft}
                 </pre>
               </div>
@@ -309,19 +362,23 @@ export function RefundWarrantyView({
 
             {/* Chronological Case Timeline */}
             <div className="space-y-2.5">
-              <h3 className="text-[13px] font-semibold text-[#172033]">Chronological Case Timeline</h3>
+              <h3 className="text-[13px] font-semibold text-[#172033] dark:text-slate-100">
+                Chronological Case Timeline
+              </h3>
               <ol className="space-y-2.5">
                 {activeCase.timeline.map((ev) => (
                   <li key={ev.id} className="flex items-start gap-3 text-[12.5px]">
                     <CheckCircle2 className="h-4 w-4 text-[#16A34A] shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-[#172033]">{ev.title}</span>
-                        <span className="font-mono text-[11px] text-[#64748B] tabular-nums">
+                        <span className="font-semibold text-[#172033] dark:text-slate-100">
+                          {ev.title}
+                        </span>
+                        <span className="font-mono text-[11px] text-[#64748B] dark:text-slate-400 tabular-nums">
                           {ev.timestamp.slice(0, 10)} · {ev.actor}
                         </span>
                       </div>
-                      <p className="text-[#64748B] mt-0.5">{ev.description}</p>
+                      <p className="text-[#64748B] dark:text-slate-400 mt-0.5">{ev.description}</p>
                     </div>
                   </li>
                 ))}

@@ -1,8 +1,11 @@
 import type {
+  ApprovalRequest,
+  ApprovalRiskLevel,
   CalendarEvent,
   CaseStatus,
   DocumentContradiction,
   DocumentRecord,
+  RewriteTone,
   Subscription,
   TimeSlotSuggestion,
 } from './types';
@@ -13,6 +16,14 @@ export interface WarrantyEligibilityResult {
   isWithinWarranty: boolean;
   recommendedStatus: CaseStatus;
   summary: string;
+}
+
+export function formatINR(amount: number, decimals = 2): string {
+  const safe = Number.isFinite(amount) ? amount : 0;
+  return `₹${new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(safe)}`;
 }
 
 export function addMonthsIso(isoDate: string, months: number): string {
@@ -228,3 +239,200 @@ export function detectDocumentContradictions(documents: DocumentRecord[]): Docum
 
   return contradictions;
 }
+
+export function deriveApprovalRiskLevel(
+  apr: Pick<ApprovalRequest, 'actionType' | 'potentialRisks' | 'title' | 'riskLevel'>
+): ApprovalRiskLevel {
+  if (apr.riskLevel) return apr.riskLevel;
+  const risksJoined = (apr.potentialRisks ?? []).join(' ').toLowerCase();
+  if (risksJoined.includes('double-book') || risksJoined.includes('missing evidence')) {
+    return 'High';
+  }
+  if (apr.actionType === 'cancel_subscription') {
+    return 'Medium';
+  }
+  if (apr.actionType === 'send_email') {
+    if (apr.title.toLowerCase().includes('confirmation')) return 'Low';
+    return 'Medium';
+  }
+  if (apr.actionType === 'create_appointment' || apr.actionType === 'generate_report') {
+    return 'Low';
+  }
+  return 'Medium';
+}
+
+export function buildApprovalPlainSummary(
+  apr: Pick<ApprovalRequest, 'actionType' | 'title' | 'recipient' | 'plainSummary' | 'mcpArgs'>
+): string {
+  if (apr.plainSummary) return apr.plainSummary;
+  const recipientClean = apr.recipient.replace(/\.+$/, '').trim();
+  if (apr.actionType === 'send_email') {
+    const cleanTitle = apr.title.replace(/^Send\s+/i, '').trim();
+    return `Send an email (${cleanTitle}) to ${recipientClean}.`;
+  }
+  if (apr.actionType === 'cancel_subscription') {
+    return `Send a cancellation request for ${apr.title.replace(/^Cancel\s+/i, '')} to ${recipientClean}.`;
+  }
+  if (apr.actionType === 'create_appointment') {
+    const args = apr.mcpArgs as { title?: string; start?: string };
+    const dateLabel = typeof args.start === 'string' ? args.start.slice(0, 10) : 'your calendar';
+    return `Add "${args.title ?? apr.title}" to your calendar on ${dateLabel}.`;
+  }
+  return apr.title;
+}
+
+export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const ALLOWED_DOCUMENT_EXTENSIONS = new Set([
+  '.pdf',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.txt',
+  '.csv',
+]);
+
+const ALLOWED_DOCUMENT_MIME_PREFIXES = ['image/', 'text/'];
+const ALLOWED_DOCUMENT_MIME_EXACT = new Set([
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/vnd.ms-excel',
+]);
+
+export function validateDocumentUploadMeta(params: {
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+}): { valid: boolean; error?: string } {
+  const name = params.fileName.trim();
+  if (!name) {
+    return { valid: false, error: 'Please choose a file to upload.' };
+  }
+  if (params.sizeBytes <= 0) {
+    return { valid: false, error: 'The selected file is empty.' };
+  }
+  if (params.sizeBytes > MAX_DOCUMENT_BYTES) {
+    const mb = (params.sizeBytes / (1024 * 1024)).toFixed(1);
+    return {
+      valid: false,
+      error: `File is too large (${mb} MB). Maximum supported size is 10 MB.`,
+    };
+  }
+  const lowerName = name.toLowerCase();
+  const dotIdx = lowerName.lastIndexOf('.');
+  const ext = dotIdx >= 0 ? lowerName.slice(dotIdx) : '';
+  const mime = (params.mimeType || '').toLowerCase();
+
+  const extOk = ALLOWED_DOCUMENT_EXTENSIONS.has(ext);
+  const mimeOk =
+    ALLOWED_DOCUMENT_MIME_EXACT.has(mime) ||
+    ALLOWED_DOCUMENT_MIME_PREFIXES.some((p) => mime.startsWith(p));
+
+  if (!extOk && !mimeOk) {
+    return {
+      valid: false,
+      error: `Unsupported file type "${ext || mime || 'unknown'}". Please upload a PDF, PNG, JPG, WEBP, TXT, or CSV file.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+export function validateAppointmentForm(params: {
+  title: string;
+  targetDate: string;
+  durationMinutes: number;
+  startTime?: string;
+  endTime?: string;
+}): { valid: boolean; errors: { title?: string; targetDate?: string; time?: string } } {
+  const errors: { title?: string; targetDate?: string; time?: string } = {};
+  const trimmedTitle = params.title.trim();
+
+  if (!trimmedTitle) {
+    errors.title = 'Please enter a meeting title.';
+  } else if (trimmedTitle.length < 3) {
+    errors.title = 'Meeting title must be at least 3 characters.';
+  } else if (trimmedTitle.length > 120) {
+    errors.title = 'Meeting title cannot exceed 120 characters.';
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(params.targetDate)) {
+    errors.targetDate = 'Choose a valid date (YYYY-MM-DD).';
+  }
+
+  if (!Number.isFinite(params.durationMinutes) || params.durationMinutes < 15 || params.durationMinutes > 480) {
+    errors.time = 'Duration must be between 15 and 480 minutes.';
+  } else if (params.startTime && params.endTime) {
+    const startMs = Date.parse(`${params.targetDate}T${params.startTime}:00`);
+    const endMs = Date.parse(`${params.targetDate}T${params.endTime}:00`);
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
+      errors.time = 'End time must be after start time.';
+    }
+  }
+
+  return {
+    valid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+export function buildDeterministicSubscriptionInsight(sub: Subscription): string {
+  const monthly = formatINR(sub.monthlyCost);
+  const annual = formatINR(sub.annualCost);
+  if (sub.category === 'Duplicate') {
+    return `Flagged as a duplicate plan: ${sub.usageNote} Cancelling saves ${monthly}/mo (${annual}/yr) without affecting your primary plan.`;
+  }
+  if (sub.category === 'Potentially Unused') {
+    return `Flagged for low usage: ${sub.usageNote} Cancelling before ${sub.nextBillingDate} saves ${monthly}/mo (${annual}/yr).`;
+  }
+  if (sub.category === 'Cancellation Pending') {
+    return `Cancellation request approved and queued before ${sub.nextBillingDate} (${annual}/yr protected).`;
+  }
+  if (sub.category === 'Cancelled') {
+    return 'Subscription has been cancelled; no further recurring UPI/card charges expected.';
+  }
+  return `Active plan in regular use (${sub.status}). Keeping this saves switching effort (${monthly}/mo).`;
+}
+
+export function applyDeterministicToneRewrite(params: {
+  subject?: string;
+  messageContent: string;
+  tone: RewriteTone;
+}): { subject?: string; messageContent: string } {
+  const raw = params.messageContent.trim();
+  const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+  const bodyCore = lines
+    .filter(
+      (l) =>
+        !/^dear\b/i.test(l) &&
+        !/^hello\b/i.test(l) &&
+        !/^sincerely/i.test(l) &&
+        !/^thank you/i.test(l) &&
+        !/^subject:/i.test(l)
+    )
+    .join('\n\n');
+  const core = bodyCore || raw;
+
+  if (params.tone === 'short') {
+    const condensed = core.split(/\n+/)[0]?.slice(0, 260) ?? core.slice(0, 260);
+    return {
+      subject: params.subject,
+      messageContent: `Hello,\n\n${condensed}\n\nPlease confirm next steps at your earliest convenience.\n\nThank you,\nKiran Kamat`,
+    };
+  }
+
+  if (params.tone === 'firm') {
+    return {
+      subject: params.subject ? `[Action Required] ${params.subject.replace(/^\[Action Required\]\s*/i, '')}` : undefined,
+      messageContent: `Dear Support Team,\n\n${core}\n\nPlease confirm resolution and written acknowledgment within 3 business days so I can close this record promptly.\n\nRegards,\nKiran Kamat`,
+    };
+  }
+
+  return {
+    subject: params.subject?.replace(/^\[Action Required\]\s*/i, ''),
+    messageContent: `Hello,\n\nI hope you are doing well.\n\n${core}\n\nThank you very much for your help!\n\nBest regards,\nKiran Kamat`,
+  };
+}
+

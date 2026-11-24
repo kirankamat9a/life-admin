@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
@@ -12,6 +13,17 @@
     background-color: #F8FAFC;
     color: #172033;
     color-scheme: light;
+    overflow-x: clip;
+  }
+
+  html.dark {
+    background-color: #0B1120;
+    color: #F1F5F9;
+    color-scheme: dark;
+  }
+
+  body {
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -20,6 +32,15 @@
 
   code, pre, .font-mono {
     font-family: var(--font-mono);
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #635BFF;
+    outline-offset: 2px;
   }
 }
 

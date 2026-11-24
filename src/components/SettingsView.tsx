@@ -1,29 +1,37 @@
-import { CheckCircle2, RotateCcw, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle2, Compass, RotateCcw, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type { WorkspaceState } from '../shared/types';
+import { HelpTip } from './HelpTip';
 
 interface SettingsViewProps {
   workspace: WorkspaceState;
-  geminiConfigured: boolean;
+  aiOnline: boolean;
   onUpdateSettings: (payload: Record<string, unknown>) => Promise<void>;
-  onResetDemo: () => Promise<void>;
+  onRequestResetDemo: () => void;
   onRunScenario: (scenario: 1 | 2 | 3) => Promise<void>;
+  onShowTour: () => void;
 }
 
 export function SettingsView({
   workspace,
-  geminiConfigured,
+  aiOnline,
   onUpdateSettings,
-  onResetDemo,
+  onRequestResetDemo,
   onRunScenario,
+  onShowTour,
 }: SettingsViewProps) {
   const { settings } = workspace;
   const [name, setName] = useState(settings.profile.name);
   const [email, setEmail] = useState(settings.profile.email);
   const [timezone, setTimezone] = useState(settings.profile.timezone);
   const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(settings.profile.name);
+    setEmail(settings.profile.email);
+    setTimezone(settings.profile.timezone);
+  }, [settings.profile.name, settings.profile.email, settings.profile.timezone]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,22 +56,12 @@ export function SettingsView({
     });
   };
 
-  const handleReset = async () => {
-    setResetting(true);
-    try {
-      await onResetDemo();
-      setSavedMsg('Demo Sandbox restored to initial state.');
-    } finally {
-      setResetting(false);
-    }
-  };
-
   return (
     <div className="space-y-6 max-w-5xl">
       {savedMsg && (
         <div
           role="status"
-          className="p-3.5 rounded-lg bg-[#F0FDF4] border border-[#BBF7D0] text-[13px] text-[#15803D] flex items-center gap-2"
+          className="p-3.5 rounded-lg bg-[#F0FDF4] dark:bg-emerald-950/60 border border-[#BBF7D0] dark:border-emerald-800 text-[13px] text-[#15803D] dark:text-emerald-200 flex items-center gap-2"
         >
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{savedMsg}</span>
@@ -73,18 +71,39 @@ export function SettingsView({
       {/* User Profile */}
       <form
         onSubmit={handleSaveProfile}
-        className="bg-white border border-[#E8ECF3] rounded-xl p-6 space-y-4"
+        className="bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl p-6 space-y-4"
       >
-        <div>
-          <h2 className="font-display text-[15px] font-semibold text-[#172033]">User Profile</h2>
-          <p className="text-[12.5px] text-[#64748B]">
-            Identity details used when drafting warranty claims and appointment proposals.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-[15px] font-semibold text-[#172033] dark:text-slate-100">
+                User Profile
+              </h2>
+              <HelpTip
+                title="Profile & Safety Settings"
+                description="Update the name and email used on drafted warranty claims and appointment proposals. Safety approval guardrails remain locked ON in Demo Mode."
+              />
+            </div>
+            <p className="text-[12.5px] text-[#64748B] dark:text-slate-400">
+              Identity details used when drafting warranty claims and appointment proposals.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onShowTour}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E8ECF3] dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 text-[12.5px] font-semibold text-[#635BFF] dark:text-indigo-300 hover:border-[#635BFF] whitespace-nowrap"
+          >
+            <Compass className="h-3.5 w-3.5" />
+            <span>Show tour again</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="prof-name" className="block text-[12px] font-medium text-[#64748B] mb-1">
+            <label
+              htmlFor="prof-name"
+              className="block text-[12px] font-medium text-[#64748B] dark:text-slate-400 mb-1"
+            >
               Full Name
             </label>
             <input
@@ -93,11 +112,14 @@ export function SettingsView({
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full h-9 px-3 text-[13px] bg-[#F8FAFC] border border-[#E8ECF3] rounded-lg text-[#172033]"
+              className="w-full h-9 px-3 text-[13px] bg-[#F8FAFC] dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 rounded-lg text-[#172033] dark:text-slate-100"
             />
           </div>
           <div>
-            <label htmlFor="prof-email" className="block text-[12px] font-medium text-[#64748B] mb-1">
+            <label
+              htmlFor="prof-email"
+              className="block text-[12px] font-medium text-[#64748B] dark:text-slate-400 mb-1"
+            >
               Email Address
             </label>
             <input
@@ -106,11 +128,14 @@ export function SettingsView({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full h-9 px-3 text-[13px] bg-[#F8FAFC] border border-[#E8ECF3] rounded-lg text-[#172033]"
+              className="w-full h-9 px-3 text-[13px] bg-[#F8FAFC] dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 rounded-lg text-[#172033] dark:text-slate-100"
             />
           </div>
           <div>
-            <label htmlFor="prof-tz" className="block text-[12px] font-medium text-[#64748B] mb-1">
+            <label
+              htmlFor="prof-tz"
+              className="block text-[12px] font-medium text-[#64748B] dark:text-slate-400 mb-1"
+            >
               Timezone
             </label>
             <input
@@ -118,7 +143,7 @@ export function SettingsView({
               type="text"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full h-9 px-3 text-[13px] bg-[#F8FAFC] border border-[#E8ECF3] rounded-lg text-[#172033]"
+              className="w-full h-9 px-3 text-[13px] bg-[#F8FAFC] dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 rounded-lg text-[#172033] dark:text-slate-100"
             />
           </div>
         </div>
@@ -134,56 +159,60 @@ export function SettingsView({
         </div>
       </form>
 
-      {/* Connected Applications & Honest Integration State */}
-      <section className="bg-white border border-[#E8ECF3] rounded-xl p-6 space-y-4">
+      {/* Connected Applications & AI Status */}
+      <section className="bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl p-6 space-y-4">
         <div>
-          <h2 className="font-display text-[15px] font-semibold text-[#172033]">
-            Connected Applications & Integration Architecture
+          <h2 className="font-display text-[15px] font-semibold text-[#172033] dark:text-slate-100">
+            Connected Applications &amp; AI Status
           </h2>
-          <p className="text-[12.5px] text-[#64748B]">
-            Honest runtime status of external accounts and local MCP sandbox connectors
+          <p className="text-[12.5px] text-[#64748B] dark:text-slate-400">
+            Current connection status for your sandbox tools and AI assistant
           </p>
         </div>
 
-        <div className="divide-y divide-[#E8ECF3] text-[13px]">
+        <div className="divide-y divide-[#E8ECF3] dark:divide-slate-800 text-[13px]">
           <div className="py-3 flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-[#172033]">Google Workspace (Gmail & Calendar OAuth)</p>
-              <p className="text-[12px] text-[#64748B]">
-                External OAuth credentials are not configured in this sandbox; Email & Calendar MCP run on synthetic demo records.
+              <p className="font-semibold text-[#172033] dark:text-slate-100">
+                Inbox &amp; Calendar Sandbox
+              </p>
+              <p className="text-[12px] text-[#64748B] dark:text-slate-400">
+                All emails, subscriptions, and calendar events run safely on simulated Demo Mode records.
               </p>
             </div>
-            <span className="text-[12px] font-semibold text-[#B45309] whitespace-nowrap">
+            <span className="text-[12px] font-semibold text-[#B45309] dark:text-amber-300 whitespace-nowrap">
               Demo Mode Active
             </span>
           </div>
 
           <div className="py-3 flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-[#172033]">Server-Side AI Reasoning Engine</p>
-              <p className="text-[12px] text-[#64748B]">
-                {geminiConfigured
-                  ? 'Connected to server-side Gemini API for synthesis and document extraction.'
-                  : 'Using deterministic local MCP rule engine (no server Gemini key detected in environment).'}
+              <p className="font-semibold text-[#172033] dark:text-slate-100">
+                AI Assistant Engine
+              </p>
+              <p className="text-[12px] text-[#64748B] dark:text-slate-400">
+                {aiOnline
+                  ? 'Connected to server-side Gemini AI for smart answers, document scanning, draft rewrites, and web grounding.'
+                  : 'Running in local fallback mode (offline rules & templates) because no AI key is active or reachable.'}
               </p>
             </div>
             <span
               className={`text-[12px] font-semibold whitespace-nowrap ${
-                geminiConfigured ? 'text-[#16A34A]' : 'text-[#64748B]'
+                aiOnline ? 'text-[#16A34A]' : 'text-[#64748B] dark:text-slate-300'
               }`}
             >
-              {geminiConfigured ? 'Gemini Connected' : 'Local Rule Engine'}
+              {aiOnline ? 'AI connected' : 'AI offline (fallback mode)'}
             </span>
           </div>
         </div>
       </section>
 
       {/* Security & Human Approval Guardrails */}
-      <section className="bg-white border border-[#E8ECF3] rounded-xl p-6 space-y-4">
+      <section className="bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl p-6 space-y-4">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-[#635BFF]" />
-          <h2 className="font-display text-[15px] font-semibold text-[#172033]">
-            Security & Human Approval Guardrails
+          <h2 className="font-display text-[15px] font-semibold text-[#172033] dark:text-slate-100">
+            Security &amp; Human Approval Guardrails
           </h2>
         </div>
 
@@ -206,9 +235,9 @@ export function SettingsView({
               key={rule.key}
               className="flex items-center justify-between gap-4 py-1 cursor-not-allowed"
             >
-              <span className="text-[#172033]">{rule.label}</span>
+              <span className="text-[#172033] dark:text-slate-200">{rule.label}</span>
               <span className="flex items-center gap-2.5 shrink-0">
-                <span className="text-[11.5px] font-medium text-[#64748B]">
+                <span className="text-[11.5px] font-medium text-[#64748B] dark:text-slate-400">
                   Always on in Demo Mode
                 </span>
                 <input
@@ -226,8 +255,8 @@ export function SettingsView({
       </section>
 
       {/* Notification Preferences */}
-      <section className="bg-white border border-[#E8ECF3] rounded-xl p-6 space-y-4">
-        <h2 className="font-display text-[15px] font-semibold text-[#172033]">
+      <section className="bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl p-6 space-y-4">
+        <h2 className="font-display text-[15px] font-semibold text-[#172033] dark:text-slate-100">
           Notification Preferences
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px]">
@@ -238,7 +267,7 @@ export function SettingsView({
               ['warrantyDeadlines', 'Warranty expiration deadlines'],
               ['pendingApprovals', 'Pending human approval alerts'],
               ['appointmentReminders', 'Calendar conflict & appointment reminders'],
-              ['mcpFailures', 'MCP connection or tool failures'],
+              ['mcpFailures', 'Connected tool or sync failures'],
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2.5 cursor-pointer">
@@ -248,31 +277,30 @@ export function SettingsView({
                 onChange={() => toggleNotif(key)}
                 className="h-4 w-4 accent-[#635BFF]"
               />
-              <span className="text-[#172033]">{label}</span>
+              <span className="text-[#172033] dark:text-slate-200">{label}</span>
             </label>
           ))}
         </div>
       </section>
 
       {/* Demo Mode Controls */}
-      <section className="bg-white border border-[#E8ECF3] rounded-xl p-6 space-y-4">
+      <section className="bg-white dark:bg-slate-900 border border-[#E8ECF3] dark:border-slate-800 rounded-xl p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="font-display text-[15px] font-semibold text-[#172033]">
+            <h2 className="font-display text-[15px] font-semibold text-[#172033] dark:text-slate-100">
               Demo Mode Sandbox Controls
             </h2>
-            <p className="text-[12.5px] text-[#64748B]">
-              Trigger hackathon demonstration scenarios or reset all simulated workspace data.
+            <p className="text-[12.5px] text-[#64748B] dark:text-slate-400">
+              Launch guided demo scenarios or reset all simulated workspace data back to defaults.
             </p>
           </div>
           <button
             type="button"
-            disabled={resetting}
-            onClick={handleReset}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-[#E8ECF3] text-[13px] font-semibold text-[#EF4444] hover:bg-[#FEF2F2] disabled:opacity-50 whitespace-nowrap shrink-0"
+            onClick={onRequestResetDemo}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 text-[13px] font-semibold text-[#EF4444] hover:bg-[#FEF2F2] dark:hover:bg-red-950/40 whitespace-nowrap shrink-0"
           >
             <RotateCcw className="h-4 w-4" />
-            <span>{resetting ? 'Resetting...' : 'Reset Demo Sandbox'}</span>
+            <span>Reset Demo Sandbox</span>
           </button>
         </div>
 
@@ -280,23 +308,23 @@ export function SettingsView({
           <button
             type="button"
             onClick={() => onRunScenario(1)}
-            className="px-3.5 py-2 rounded-lg bg-[#F8FAFC] border border-[#E8ECF3] text-[12.5px] font-semibold text-[#172033] hover:border-[#635BFF]"
+            className="px-3.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 text-[12.5px] font-semibold text-[#172033] dark:text-slate-100 hover:border-[#635BFF]"
           >
             Trigger Demo Scenario 1 (Laptop Warranty)
           </button>
           <button
             type="button"
             onClick={() => onRunScenario(2)}
-            className="px-3.5 py-2 rounded-lg bg-[#F8FAFC] border border-[#E8ECF3] text-[12.5px] font-semibold text-[#172033] hover:border-[#635BFF]"
+            className="px-3.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 text-[12.5px] font-semibold text-[#172033] dark:text-slate-100 hover:border-[#635BFF]"
           >
-            Trigger Demo Scenario 2 (Subscriptions)
+            Trigger Demo Scenario 2 (UPI Subscriptions)
           </button>
           <button
             type="button"
             onClick={() => onRunScenario(3)}
-            className="px-3.5 py-2 rounded-lg bg-[#F8FAFC] border border-[#E8ECF3] text-[12.5px] font-semibold text-[#172033] hover:border-[#635BFF]"
+            className="px-3.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-[#E8ECF3] dark:border-slate-700 text-[12.5px] font-semibold text-[#172033] dark:text-slate-100 hover:border-[#635BFF]"
           >
-            Trigger Demo Scenario 3 (Calendar Slot)
+            Trigger Demo Scenario 3 (IST Calendar Slot)
           </button>
         </div>
       </section>

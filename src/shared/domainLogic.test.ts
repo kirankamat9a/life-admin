@@ -2,13 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addMonthsIso,
+  applyDeterministicToneRewrite,
+  buildApprovalPlainSummary,
+  buildDeterministicSubscriptionInsight,
   calculateSubscriptionAnalytics,
+  deriveApprovalRiskLevel,
   detectCalendarConflicts,
   detectDocumentContradictions,
   evaluateWarrantyEligibility,
   findAvailableSlots,
+  formatINR,
+  MAX_DOCUMENT_BYTES,
+  validateAppointmentForm,
+  validateDocumentUploadMeta,
 } from './domainLogic';
 import type { CalendarEvent, DocumentRecord, Subscription } from './types';
+
+test('formatINR formats Indian numbering with Rupee symbol', () => {
+  assert.equal(formatINR(124990), '₹1,24,990.00');
+  assert.equal(formatINR(499), '₹499.00');
+  assert.equal(formatINR(47964, 0), '₹47,964');
+});
 
 test('addMonthsIso computes exact warranty expiration date', () => {
   assert.equal(addMonthsIso('2026-08-24', 24), '2028-08-24');
@@ -44,6 +58,7 @@ test('evaluateWarrantyEligibility identifies eligible, evidence-required, and ex
     hasDefectEvidence: true,
   });
   assert.equal(expired.isWithinWarranty, false);
+  assert.ok(expired.summary.toLowerCase().includes('expired'));
 });
 
 test('calculateSubscriptionAnalytics computes monthly spend, savings, and upcoming renewals', () => {
@@ -109,7 +124,7 @@ test('calculateSubscriptionAnalytics computes monthly spend, savings, and upcomi
   assert.equal(stats.upcomingWithin14Days[0].id, '1');
 });
 
-test('detectCalendarConflicts and findAvailableSlots respect busy blocks', () => {
+test('detectCalendarConflicts and findAvailableSlots respect busy blocks across periods', () => {
   const events: CalendarEvent[] = [
     {
       id: 'e1',
@@ -137,6 +152,14 @@ test('detectCalendarConflicts and findAvailableSlots respect busy blocks', () =>
   assert.equal(conflicts.length, 1);
   assert.equal(conflicts[0].id, 'e1');
 
+  const morningSlots = findAvailableSlots({
+    events,
+    targetDate: '2026-11-25',
+    durationMinutes: 60,
+    preferredPeriod: 'Morning',
+  });
+  assert.ok(morningSlots.length > 0 && morningSlots.every((s) => s.period === 'Morning'));
+
   const afternoonSlots = findAvailableSlots({
     events,
     targetDate: '2026-11-25',
@@ -148,6 +171,22 @@ test('detectCalendarConflicts and findAvailableSlots respect busy blocks', () =>
   assert.ok(afternoonSlots.some((s) => s.start === '2026-11-25T14:00:00'));
   assert.ok(!afternoonSlots.some((s) => s.start === '2026-11-25T13:00:00'));
   assert.ok(!afternoonSlots.some((s) => s.start === '2026-11-25T15:30:00'));
+
+  const eveningSlots = findAvailableSlots({
+    events,
+    targetDate: '2026-11-25',
+    durationMinutes: 60,
+    preferredPeriod: 'Evening',
+  });
+  assert.ok(eveningSlots.length > 0 && eveningSlots.every((s) => s.period === 'Evening'));
+
+  const anySlots = findAvailableSlots({
+    events,
+    targetDate: '2026-11-25',
+    durationMinutes: 60,
+    preferredPeriod: 'Any',
+  });
+  assert.equal(anySlots.length, morningSlots.length + afternoonSlots.length + eveningSlots.length);
 });
 
 test('detectDocumentContradictions flags mismatched dates across matching products', () => {
@@ -183,3 +222,105 @@ test('detectDocumentContradictions flags mismatched dates across matching produc
   assert.equal(issues.length, 1);
   assert.equal(issues[0].field, 'Purchase Date');
 });
+
+test('deriveApprovalRiskLevel and buildApprovalPlainSummary classify approvals accurately', () => {
+  assert.equal(
+    deriveApprovalRiskLevel({
+      actionType: 'create_appointment',
+      potentialRisks: ['Double-books Dental Checkup.'],
+      title: 'Schedule meeting',
+    }),
+    'High'
+  );
+  assert.equal(
+    deriveApprovalRiskLevel({
+      actionType: 'cancel_subscription',
+      potentialRisks: ['Ends access at cycle end.'],
+      title: 'Cancel JioCloud Plus',
+    }),
+    'Medium'
+  );
+  assert.equal(
+    deriveApprovalRiskLevel({
+      actionType: 'create_appointment',
+      potentialRisks: ['None'],
+      title: 'Schedule sync',
+    }),
+    'Low'
+  );
+
+  const summary = buildApprovalPlainSummary({
+    actionType: 'create_appointment',
+    title: 'Create Appointment: Team Sync',
+    recipient: 'user@example.com',
+    mcpArgs: { title: 'Team Sync', start: '2026-11-25T14:00:00' },
+  });
+  assert.equal(summary, 'Add "Team Sync" to your calendar on 2026-11-25.');
+});
+
+test('validateDocumentUploadMeta enforces file type and 10 MB size limit', () => {
+  assert.equal(
+    validateDocumentUploadMeta({ fileName: 'invoice.pdf', mimeType: 'application/pdf', sizeBytes: 2048 }).valid,
+    true
+  );
+  assert.equal(
+    validateDocumentUploadMeta({ fileName: 'huge.pdf', mimeType: 'application/pdf', sizeBytes: MAX_DOCUMENT_BYTES + 1 }).valid,
+    false
+  );
+  assert.equal(
+    validateDocumentUploadMeta({ fileName: 'script.exe', mimeType: 'application/x-msdownload', sizeBytes: 512 }).valid,
+    false
+  );
+});
+
+test('validateAppointmentForm catches missing title and inverted times', () => {
+  const invalid = validateAppointmentForm({
+    title: 'Hi',
+    targetDate: '2026-11-25',
+    durationMinutes: 60,
+    startTime: '15:00',
+    endTime: '14:00',
+  });
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.title);
+  assert.ok(invalid.errors.time);
+
+  const valid = validateAppointmentForm({
+    title: 'Quarterly Sync',
+    targetDate: '2026-11-25',
+    durationMinutes: 45,
+    startTime: '14:00',
+    endTime: '14:45',
+  });
+  assert.equal(valid.valid, true);
+});
+
+test('buildDeterministicSubscriptionInsight and applyDeterministicToneRewrite work deterministically', () => {
+  const insight = buildDeterministicSubscriptionInsight({
+    id: 'sub-2',
+    name: 'JioCloud Plus',
+    provider: 'JioCloud India',
+    providerEmail: 'billing@jiocloud-demo.example',
+    monthlyCost: 499,
+    annualCost: 5988,
+    billingFrequency: 'Monthly',
+    lastPayment: '2026-11-03',
+    nextBillingDate: '2026-12-03',
+    category: 'Duplicate',
+    status: 'Duplicate',
+    cancellationInstructions: 'Email support',
+    usageNote: '0 MB uploaded in 120 days.',
+    potentialSavingsMonthly: 499,
+  });
+  assert.ok(insight.includes('₹499.00/mo'));
+  assert.ok(insight.includes('₹5,988.00/yr'));
+
+  const firm = applyDeterministicToneRewrite({
+    subject: 'Warranty Request',
+    messageContent: 'Please repair my laptop under warranty.',
+    tone: 'firm',
+  });
+  assert.ok(firm.subject?.includes('[Action Required]'));
+  assert.ok(firm.messageContent.includes('3 business days'));
+});
+

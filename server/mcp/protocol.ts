@@ -147,8 +147,10 @@ export class McpClientRouter {
 
     const jsonPart = res.result?.content?.find((c) => c.type === 'json');
     const textPart = res.result?.content?.find((c) => c.type === 'text');
+    const latestInv = state.mcpHistory[0];
     return {
       ok: !res.result?.isError,
+      blockedApproval: latestInv?.status === 'blocked_approval',
       summary: textPart?.text ?? 'MCP call completed',
       data: jsonPart?.data ?? null,
     };

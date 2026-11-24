@@ -101,6 +101,7 @@ export interface Subscription {
   usageNote: string;
   potentialSavingsMonthly: number;
   sourceEmailId?: string;
+  aiInsight?: string;
 }
 
 export interface CalendarEvent {
@@ -156,9 +157,13 @@ export interface DocumentRecord {
   rawText: string;
 }
 
+export type ApprovalRiskLevel = 'Low' | 'Medium' | 'High';
+
 export interface ApprovalRequest {
   id: string;
   title: string;
+  plainSummary?: string;
+  riskLevel?: ApprovalRiskLevel;
   actionType: ApprovalActionType;
   recipient: string;
   subject?: string;
@@ -230,6 +235,11 @@ export interface AgentRun {
   steps: AgentStep[];
 }
 
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -237,6 +247,8 @@ export interface ChatMessage {
   timestamp: string;
   reasoningSummary?: string;
   citations?: EvidenceCitation[];
+  groundingSources?: GroundingSource[];
+  fallbackMode?: boolean;
   toolsExecuted?: Array<{ server: string; tool: string; summary: string }>;
   approvalId?: string;
   attachments?: Array<{ name: string; mimeType: string; documentId?: string }>;
@@ -311,4 +323,24 @@ export interface WorkspaceState {
   notifications: NotificationItem[];
   settings: UserSettings;
   tasksCompletedCount: number;
+}
+
+export interface HealthResponse {
+  ok: boolean;
+  geminiConfigured: boolean;
+  uptime: number;
+}
+
+export type RewriteTone = 'polite' | 'firm' | 'short';
+
+export interface DocumentExtractPreview {
+  fileName: string;
+  mimeType: string;
+  type: DocumentRecord['type'];
+  previewUrl?: string;
+  extractedFields: DocumentRecord['extractedFields'];
+  rawText: string;
+  citations: string[];
+  geminiWarning?: string;
+  fallbackUsed: boolean;
 }
